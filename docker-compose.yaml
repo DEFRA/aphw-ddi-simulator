@@ -1,10 +1,17 @@
 services:
-  ffc-template-node:
+  aphw-ddi-simulator:
     build:
       context: .
       target: production
-    image: ffc-template-node
-    container_name: ffc-template-node
+      dockerfile: Dockerfile
+    image: aphw-ddi-simulator
+    container_name: aphw-ddi-simulator
+    restart: on-failure
+    network_mode: host
     environment:
-      APPINSIGHTS_CLOUDROLE: ffc-template-node-local
+      APPINSIGHTS_CLOUDROLE: aphw-ddi-simulator-local
       APPINSIGHTS_CONNECTIONSTRING: ${APPINSIGHTS_CONNECTIONSTRING}
+      SIMULATOR_URL: ${SIMULATOR_URL:-http://localhost:8443}
+      EMAIL: ${EMAIL:-test@example.com}
+      REDIRECT_URLS: ${REDIRECT_URLS:-http://localhost:3003/authenticate}
+      POST_LOGOUT_REDIRECT_URLS: ${POST_LOGOUT_REDIRECT_URLS:-http://localhost:3003/post-logout}

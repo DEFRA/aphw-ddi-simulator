@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "module": "CommonJS",
+    "target": "es2022",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "strict": true,
+    "sourceMap": true,
+    "outDir": "app",
+    "baseUrl": ".",
+    "typeRoots": ["@types", "node_modules/@types"],
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["coverage", "src/**/**/tests","${configDir}/node_modules","node_modules","${configDir}/app"]
+}

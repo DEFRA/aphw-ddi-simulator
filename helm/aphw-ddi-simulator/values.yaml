@@ -1,0 +1,44 @@
+# Required values to support CI pipeline
+environment: production
+environmentCode:
+name: aphw-ddi-simulator
+namespace: aphw-ddi
+workstream: aphw-ddi
+image: aphw-ddi-simulator
+
+appInsights:
+  connectionString:
+
+labels: {}
+
+containerConfigMap: {}
+
+containerSecret: {}
+
+deployment: {}
+
+port: &port 3000
+
+container:
+  resourceTier: M
+  port: *port
+
+livenessProbe:
+  path: /healthz
+  port: *port
+  initialDelaySeconds: 20
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 5
+
+readinessProbe:
+  path: /healthy
+  port: *port
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 5
+
+azureIdentity:
+  clientID: not-a-real-clientID
+  resourceID: not-a-real-resourceID

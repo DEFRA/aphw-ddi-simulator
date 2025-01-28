@@ -2,21 +2,13 @@
 # to provide dependencies and expose ports for local testing
 
 services:
-  ffc-template-node:
+  aphw-ddi-simulator:
     build:
       target: development
-    image: ffc-template-node-development
-    container_name: ffc-template-node-development
+    image: aphw-ddi-simulator-development
+    container_name: aphw-ddi-simulator-development
     ports:
-      - "3000:3000"
-      - "9229:9229"
+      - "8443:3000"
     volumes:
       - ./app:/home/node/app
       - ./package.json:/home/node/package.json
-    networks:
-      - ffc-template-node
-
-networks:
-  ffc-template-node:
-    name: ffc-template-node
-    driver: bridge

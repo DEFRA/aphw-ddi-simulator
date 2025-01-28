@@ -1,5 +1,5 @@
 ARG PARENT_VERSION=2.5.0-node22.11.0
-ARG PORT=3000
+ARG PORT=8443
 ARG PORT_DEBUG=9229
 
 # Development
@@ -13,7 +13,9 @@ ENV PORT=${PORT}
 EXPOSE ${PORT} ${PORT_DEBUG}
 
 COPY --chown=node:node package*.json ./
+COPY --chown=node:node . ./
 RUN npm install
+RUN npm run build
 COPY --chown=node:node . .
 CMD [ "npm", "run", "start:watch" ]
 
@@ -24,6 +26,7 @@ LABEL uk.gov.defra.ffc.parent-image=defradigital/node:${PARENT_VERSION}
 
 ARG PORT
 ENV PORT=${PORT}
+ENV NODE_ENV "production"
 EXPOSE ${PORT}
 
 COPY --from=development /home/node/app/ ./app/

@@ -1,0 +1,724 @@
+const {
+  errors,
+  exportSPKI,
+  importPKCS8,
+  jwtVerify,
+  SignJWT,
+  UnsecuredJWT
+} = require('jose')
+const { createApp } = require('../../../../app/app')
+const request = require('supertest')
+const { generateKeyPairSync, randomBytes, randomUUID } = require('crypto')
+const { Config } = require('../../../../app/config')
+const {
+  INVALID_ISSUER,
+  RSA_PRIVATE_TOKEN_SIGNING_KEY_ID,
+  SESSION_ID,
+  VALID_CLAIMS,
+  RSA_PRIVATE_TOKEN_SIGNING_KEY
+} = require('../../../../app/constants')
+const { decodeJwtNoVerify } = require('./helper/decode-jwt-no-verify')
+
+const TOKEN_ENDPOINT = '/token'
+
+const rsaKeyPair = generateKeyPairSync('rsa', {
+  modulusLength: 2048
+})
+
+const knownClientId = 'd76db56760ceda7cab875f085c54bd35'
+const redirectUri = 'https://localhost:3000/authentication-callback'
+const knownSub = 'urn:fdc:gov.uk:2022:9e374b47c4ef6de6551be5f28d97f9dd'
+const knownAuthCode = 'aac8964a69b2c7c56c3bfcf108248fe1'
+const redirectUriMismatchCode = '5c255ea25c063a83a5f02242103bdc9f'
+const nonce = 'bf05c36da9122a7378439924c011c51c'
+const scopes = ['openid']
+const audience = 'http://localhost:3000/token'
+
+const validAuthRequestParams = {
+  nonce,
+  redirectUri,
+  scopes,
+  claims: VALID_CLAIMS,
+  vtr: {
+    credentialTrust: 'Cl.Cm',
+    levelOfConfidence: 'P2'
+  }
+}
+const redirectUriMismatchParams = {
+  nonce,
+  redirectUri: 'https://example.com/authentication-callback-invalid/',
+  scopes,
+  claims: [],
+  vtr: {
+    credentialTrust: 'Cl.Cm',
+    levelOfConfidence: null
+  }
+}
+
+const createValidClientAssertion = async (
+  payload
+) => {
+  return await new SignJWT(payload)
+    .setProtectedHeader({
+      alg: 'RS256'
+    })
+    .sign(rsaKeyPair.privateKey)
+}
+
+const createClientAssertionPayload = (
+  payload,
+  isExpired = false
+) =>
+  new UnsecuredJWT(payload)
+    .setIssuedAt(Math.floor(Date.now() / 1000))
+    .setExpirationTime(isExpired ? '-1h' : '1h')
+    .setJti(randomUUID())
+    .setAudience(audience)
+    .encode()
+    .split('.')[1]
+
+const createClientAssertionHeader = (alg) =>
+  Buffer.from(JSON.stringify({ alg: alg ?? 'RS256' })).toString('base64url')
+
+const fakeSignature = () => randomBytes(16).toString('hex')
+
+const setupClientConfig = async (clientId, errors = []) => {
+  process.env.CLIENT_ID = clientId
+  process.env.REDIRECT_URLS = redirectUri
+  process.env.SUB = knownSub
+  process.env.ID_TOKEN_ERRORS = errors.join(',')
+  process.env.CLAIMS = VALID_CLAIMS.join(',')
+  const publicKey = await exportSPKI(rsaKeyPair.publicKey)
+  process.env.PUBLIC_KEY = publicKey
+  process.env.ID_TOKEN_SIGNING_ALGORITHM = 'RS256'
+  Config.resetInstance()
+}
+
+describe('/token endpoint tests, invalid request', () => {
+  test('returns an invalid_request error for missing grant_type', async () => {
+    const app = createApp()
+    const response = await request(app).post(TOKEN_ENDPOINT).send({
+      code: '123456',
+      redirect_uri: 'http://localhost:8080/authorization-code/callback',
+      client_assertion_type:
+        'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+      client_assertion:
+        'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIiLCJpc3MiOiIiLCJhdWQiOiIiLCJqdGkiOiIifQ.r1Ylfhhy6VNSlhlhW1N89F3WfIGuko2rvSRWO4yK1BI'
+    })
+
+    expect(response.status).toEqual(400)
+    expect(response.body).toStrictEqual({
+      error: 'invalid_request',
+      error_description: 'Request is missing grant_type parameter'
+    })
+  })
+
+  test('returns an invalid_request error when grant_type is not authorization_code', async () => {
+    const app = createApp()
+    const response = await request(app).post(TOKEN_ENDPOINT).send({
+      grant_type: 'not_authorization_code',
+      code: '123456',
+      redirect_uri: 'http://localhost:8080/authorization-code/callback',
+      client_assertion_type:
+        'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+      client_assertion:
+        'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIiLCJpc3MiOiIiLCJhdWQiOiIiLCJqdGkiOiIifQ.r1Ylfhhy6VNSlhlhW1N89F3WfIGuko2rvSRWO4yK1BI'
+    })
+
+    expect(response.status).toEqual(400)
+    expect(response.body).toStrictEqual({
+      error: 'unsupported_grant_type',
+      error_description: 'Unsupported grant type'
+    })
+  })
+
+  test('returns an invalid_request no redirect_uri is included', async () => {
+    const app = createApp()
+    const response = await request(app).post(TOKEN_ENDPOINT).send({
+      grant_type: 'authorization_code',
+      code: '123456',
+      client_assertion_type:
+        'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+      client_assertion:
+        'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIiLCJpc3MiOiIiLCJhdWQiOiIiLCJqdGkiOiIifQ.r1Ylfhhy6VNSlhlhW1N89F3WfIGuko2rvSRWO4yK1BI'
+    })
+
+    expect(response.status).toEqual(400)
+    expect(response.body).toStrictEqual({
+      error: 'invalid_request',
+      error_description: 'Request is missing redirect_uri parameter'
+    })
+  })
+
+  test('returns an invalid_request when no auth_code is included', async () => {
+    const app = createApp()
+    const response = await request(app).post(TOKEN_ENDPOINT).send({
+      grant_type: 'authorization_code',
+      redirect_uri: 'http://localhost:8080/authorization-code/callback',
+      client_assertion_type:
+        'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+      client_assertion:
+        'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIiLCJpc3MiOiIiLCJhdWQiOiIiLCJqdGkiOiIifQ.r1Ylfhhy6VNSlhlhW1N89F3WfIGuko2rvSRWO4yK1BI'
+    })
+
+    expect(response.status).toEqual(400)
+    expect(response.body).toStrictEqual({
+      error: 'invalid_request',
+      error_description: 'Request is missing code parameter'
+    })
+  })
+
+  test('returns an invalid_request when the client_assertion_type is not included', async () => {
+    const app = createApp()
+    const response = await request(app).post(TOKEN_ENDPOINT).send({
+      grant_type: 'authorization_code',
+      code: '123456',
+      redirect_uri: 'http://localhost:8080/authorization-code/callback',
+      client_assertion:
+        'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIiLCJpc3MiOiIiLCJhdWQiOiIiLCJqdGkiOiIifQ.r1Ylfhhy6VNSlhlhW1N89F3WfIGuko2rvSRWO4yK1BI'
+    })
+
+    expect(response.status).toEqual(400)
+    expect(response.body).toStrictEqual({
+      error: 'invalid_request',
+      error_description: 'Invalid token authentication method used'
+    })
+  })
+
+  test('returns an invalid_request when the client_assertion is not included', async () => {
+    const app = createApp()
+    const response = await request(app).post(TOKEN_ENDPOINT).send({
+      grant_type: 'authorization_code',
+      code: '123456',
+      client_assertion_type:
+        'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+      redirect_uri: 'http://localhost:8080/authorization-code/callback'
+    })
+
+    expect(response.status).toEqual(400)
+    expect(response.body).toStrictEqual({
+      error: 'invalid_request',
+      error_description: 'Invalid token authentication method used'
+    })
+  })
+
+  test('returns an invalid_request when the client_assertion is not included', async () => {
+    const app = createApp()
+    const response = await request(app).post(TOKEN_ENDPOINT).send({
+      grant_type: 'authorization_code',
+      code: '123456',
+      client_assertion_type:
+        'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+      redirect_uri: 'http://localhost:8080/authorization-code/callback'
+    })
+
+    expect(response.status).toEqual(400)
+    expect(response.body).toStrictEqual({
+      error: 'invalid_request',
+      error_description: 'Invalid token authentication method used'
+    })
+  })
+
+  test('returns an invalid_request when the client_assertion_type is not included', async () => {
+    const app = createApp()
+    const response = await request(app).post(TOKEN_ENDPOINT).send({
+      grant_type: 'authorization_code',
+      code: '123456',
+      client_assertion_type:
+        'urn:ietf:params:oauth:client-assertion-type:jwt-bearer-invalid',
+      redirect_uri: 'http://localhost:8080/authorization-code/callback',
+      client_assertion:
+        'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIiLCJpc3MiOiIiLCJhdWQiOiIiLCJqdGkiOiIifQ.r1Ylfhhy6VNSlhlhW1N89F3WfIGuko2rvSRWO4yK1BI'
+    })
+
+    expect(response.status).toEqual(400)
+    expect(response.body).toStrictEqual({
+      error: 'invalid_request',
+      error_description: 'Invalid private_key_jwt'
+    })
+  })
+})
+
+describe('/token endpoint tests, invalid client assertion', () => {
+  test('returns an invalid_request if client_assertion is missing iss', async () => {
+    await setupClientConfig(knownClientId)
+
+    const clientAssertion =
+      createClientAssertionHeader() +
+      '.' +
+      createClientAssertionPayload({
+        sub: knownClientId,
+        aud: audience
+      }) +
+      '.' +
+      fakeSignature()
+
+    const app = createApp()
+    const response = await request(app).post(TOKEN_ENDPOINT).send({
+      grant_type: 'authorization_code',
+      code: '123456',
+      client_assertion_type:
+        'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+      redirect_uri: redirectUri,
+      client_assertion: clientAssertion
+    })
+    expect(response.status).toEqual(400)
+    expect(response.body).toStrictEqual({
+      error: 'invalid_request',
+      error_description: 'Invalid private_key_jwt'
+    })
+  })
+
+  test('returns an invalid_request if client_assertion is missing sub', async () => {
+    await setupClientConfig(knownClientId)
+
+    const clientAssertion =
+      createClientAssertionHeader() +
+      '.' +
+      createClientAssertionPayload({
+        iss: knownClientId,
+        aud: audience
+      }) +
+      '.' +
+      fakeSignature()
+
+    const app = createApp()
+    const response = await request(app).post(TOKEN_ENDPOINT).send({
+      grant_type: 'authorization_code',
+      code: '123456',
+      client_assertion_type:
+        'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+      redirect_uri: redirectUri,
+      client_assertion: clientAssertion
+    })
+    expect(response.status).toEqual(400)
+    expect(response.body).toStrictEqual({
+      error: 'invalid_request',
+      error_description: 'Invalid private_key_jwt'
+    })
+  })
+
+  test('returns an invalid_request if signing alg in header is not RS256', async () => {
+    await setupClientConfig(knownClientId)
+
+    const clientAssertion =
+      createClientAssertionHeader('fake-alg') +
+      '.' +
+      createClientAssertionPayload({
+        iss: knownClientId,
+        sub: knownClientId,
+        aud: audience
+      }) +
+      '.' +
+      fakeSignature()
+
+    const app = createApp()
+    const response = await request(app).post(TOKEN_ENDPOINT).send({
+      grant_type: 'authorization_code',
+      code: '123456',
+      client_assertion_type:
+        'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+      redirect_uri: redirectUri,
+      client_assertion: clientAssertion
+    })
+    expect(response.status).toEqual(400)
+    expect(response.body).toStrictEqual({
+      error: 'invalid_request',
+      error_description: 'Invalid private_key_jwt'
+    })
+  })
+
+  test('returns an invalid_client for an unknown client_id', async () => {
+    await setupClientConfig(randomUUID())
+
+    const clientAssertion =
+      createClientAssertionHeader() +
+      '.' +
+      createClientAssertionPayload({
+        sub: knownClientId,
+        iss: knownClientId,
+        aud: audience
+      }) +
+      '.' +
+      fakeSignature()
+
+    const app = createApp()
+    const response = await request(app).post(TOKEN_ENDPOINT).send({
+      grant_type: 'authorization_code',
+      code: '123456',
+      client_assertion_type:
+        'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+      redirect_uri: redirectUri,
+      client_assertion: clientAssertion
+    })
+    expect(response.status).toEqual(401)
+    expect(response.body).toStrictEqual({
+      error: 'invalid_client',
+      error_description: 'Client authentication failed'
+    })
+  })
+
+  test('returns an invalid_grant for an expired client assertion ', async () => {
+    await setupClientConfig(knownClientId)
+
+    const clientAssertion =
+      createClientAssertionHeader() +
+      '.' +
+      createClientAssertionPayload(
+        {
+          iss: knownClientId,
+          sub: knownClientId,
+          aud: audience
+        },
+        true
+      ) +
+      '.' +
+      fakeSignature()
+
+    const app = createApp()
+    const response = await request(app).post(TOKEN_ENDPOINT).send({
+      grant_type: 'authorization_code',
+      code: '123456',
+      client_assertion_type:
+        'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+      redirect_uri: redirectUri,
+      client_assertion: clientAssertion
+    })
+    expect(response.status).toEqual(400)
+    expect(response.body).toStrictEqual({
+      error: 'invalid_grant',
+      error_description: 'private_key_jwt has expired'
+    })
+  })
+
+  test('returns an invalid_client for an invalid signature', async () => {
+    await setupClientConfig(knownClientId)
+
+    const clientAssertion =
+      createClientAssertionHeader() +
+      '.' +
+      createClientAssertionPayload({
+        iss: knownClientId,
+        sub: knownClientId,
+        aud: audience
+      }) +
+      '.' +
+      fakeSignature()
+
+    const app = createApp()
+    const response = await request(app).post(TOKEN_ENDPOINT).send({
+      grant_type: 'authorization_code',
+      code: '123456',
+      client_assertion_type:
+        'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+      redirect_uri: redirectUri,
+      client_assertion: clientAssertion
+    })
+    expect(response.status).toEqual(400)
+    expect(response.body).toStrictEqual({
+      error: 'invalid_client',
+      error_description: 'Invalid signature in private_key_jwt'
+    })
+  })
+
+  test('returns an invalid signature for an unknown audience in client_assertion', async () => {
+    await setupClientConfig(knownClientId)
+
+    jest
+      .spyOn(Config.getInstance(), 'getAuthCodeRequestParams')
+      .mockReturnValue(undefined)
+
+    const clientAssertion =
+      createClientAssertionHeader() +
+      '.' +
+      createClientAssertionPayload({
+        iss: knownClientId,
+        sub: knownClientId,
+        aud: 'https://identity-provider.example.com/token',
+        jti: randomUUID(),
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600
+      }) +
+      '.' +
+      fakeSignature()
+
+    const app = createApp()
+    const response = await request(app).post(TOKEN_ENDPOINT).send({
+      grant_type: 'authorization_code',
+      code: randomUUID(),
+      client_assertion_type:
+        'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+      redirect_uri: redirectUri,
+      client_assertion: clientAssertion
+    })
+    expect(response.status).toEqual(400)
+    expect(response.body).toStrictEqual({
+      error: 'invalid_client',
+      error_description: 'Invalid signature in private_key_jwt'
+    })
+  })
+})
+
+describe('/token endpoint, configured error responses', () => {
+  jest.spyOn(Config.getInstance(), 'getIdTokenErrors')
+  let validRequest
+
+  beforeEach(async () => {
+    validRequest = {
+      grant_type: 'authorization_code',
+      code: knownAuthCode,
+      client_assertion_type:
+        'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+      redirect_uri: redirectUri,
+      client_assertion: await createValidClientAssertion({
+        iss: knownClientId,
+        sub: knownClientId,
+        aud: audience,
+        jti: randomUUID(),
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600
+      })
+    }
+  })
+
+  test('returns an invalid header if the client config has enabled INVALID_ALG_HEADER', async () => {
+    await setupClientConfig(knownClientId, ['INVALID_ALG_HEADER'])
+    jest
+      .spyOn(Config.getInstance(), 'getAuthCodeRequestParams')
+      .mockReturnValue(validAuthRequestParams)
+
+    const app = createApp()
+    const response = await request(app).post(TOKEN_ENDPOINT).send(validRequest)
+    expect(response.status).toBe(200)
+    const { id_token: idToken } = response.body
+    const { protectedHeader } = decodeJwtNoVerify(idToken)
+    expect(protectedHeader).toStrictEqual({
+      alg: 'HS256'
+    })
+  })
+
+  test('returns an invalid signature if the client config has enabled INVALID_SIGNATURE', async () => {
+    await setupClientConfig(knownClientId, ['INVALID_SIGNATURE'])
+    jest
+      .spyOn(Config.getInstance(), 'getAuthCodeRequestParams')
+      .mockReturnValue(validAuthRequestParams)
+
+    const app = createApp()
+    const response = await request(app).post(TOKEN_ENDPOINT).send(validRequest)
+    const { id_token: idToken } = response.body
+    const rsaKey = await importPKCS8(RSA_PRIVATE_TOKEN_SIGNING_KEY, 'RS256')
+    await expect(jwtVerify(idToken, rsaKey)).rejects.toThrow(
+      errors.JWSSignatureVerificationFailed
+    )
+  })
+
+  test('returns an invalid vot if the client config has enabled INCORRECT_VOT', async () => {
+    await setupClientConfig(knownClientId, ['INCORRECT_VOT'])
+    jest
+      .spyOn(Config.getInstance(), 'getAuthCodeRequestParams')
+      .mockReturnValue(validAuthRequestParams)
+
+    const app = createApp()
+    const response = await request(app).post(TOKEN_ENDPOINT).send(validRequest)
+    const { id_token: idToken } = response.body
+    const { payload } = decodeJwtNoVerify(idToken)
+    expect(payload.vot).not.toEqual(validAuthRequestParams.vtr.credentialTrust)
+    expect(payload.vot).toBe('Cl')
+  })
+
+  test('returns an invalid iat in the future if the client config has enabled TOKEN_NOT_VALID_YET', async () => {
+    await setupClientConfig(knownClientId, ['TOKEN_NOT_VALID_YET'])
+    jest
+      .spyOn(Config.getInstance(), 'getAuthCodeRequestParams')
+      .mockReturnValue(validAuthRequestParams)
+
+    const app = createApp()
+    const response = await request(app).post(TOKEN_ENDPOINT).send(validRequest)
+    const { id_token: idToken } = response.body
+    const { payload } = decodeJwtNoVerify(idToken)
+    expect(payload.iat).toBeGreaterThan(Date.now() / 1000)
+  })
+
+  test('returns an expired token if the client config has enabled TOKEN_EXPIRED', async () => {
+    await setupClientConfig(knownClientId, ['TOKEN_EXPIRED'])
+    jest
+      .spyOn(Config.getInstance(), 'getAuthCodeRequestParams')
+      .mockReturnValue(validAuthRequestParams)
+
+    const app = createApp()
+    const response = await request(app).post(TOKEN_ENDPOINT).send(validRequest)
+    const { id_token: idToken } = response.body
+    const { payload } = decodeJwtNoVerify(idToken)
+    expect(payload.iat).toBeLessThan(Date.now() / 1000)
+  })
+
+  test('returns an invalid aud if the client config has enabled INVALID_AUD', async () => {
+    await setupClientConfig(knownClientId, ['INVALID_AUD'])
+    jest
+      .spyOn(Config.getInstance(), 'getAuthCodeRequestParams')
+      .mockReturnValue(validAuthRequestParams)
+
+    const app = createApp()
+    const response = await request(app).post(TOKEN_ENDPOINT).send(validRequest)
+    const { id_token: idToken } = response.body
+    const { payload } = decodeJwtNoVerify(idToken)
+    expect(payload.aud).not.toBe(knownClientId)
+  })
+
+  test('returns an invalid iss if the client config has enabled INVALID_ISS', async () => {
+    await setupClientConfig(knownClientId, ['INVALID_ISS'])
+    jest
+      .spyOn(Config.getInstance(), 'getAuthCodeRequestParams')
+      .mockReturnValue(validAuthRequestParams)
+
+    const app = createApp()
+    const response = await request(app).post(TOKEN_ENDPOINT).send(validRequest)
+    const { id_token: idToken } = response.body
+    const { payload } = decodeJwtNoVerify(idToken)
+    expect(payload.iss).not.toBe('http://localhost:3000/')
+    expect(payload.iss).toBe(INVALID_ISSUER)
+  })
+
+  test('returns an invalid nonce if the client config has enabled NONCE_NOT_MATCHING', async () => {
+    await setupClientConfig(knownClientId, ['NONCE_NOT_MATCHING'])
+    jest
+      .spyOn(Config.getInstance(), 'getAuthCodeRequestParams')
+      .mockReturnValue(validAuthRequestParams)
+
+    const app = createApp()
+    const response = await request(app).post(TOKEN_ENDPOINT).send(validRequest)
+    const { id_token: idToken } = response.body
+    const { payload } = decodeJwtNoVerify(idToken)
+    expect(payload.nonce).not.toBe(validAuthRequestParams.nonce)
+  })
+})
+
+describe('/token endpoint valid client_assertion', () => {
+  afterEach(() => {
+    jest.restoreAllMocks()
+  })
+
+  test('returns an invalid_grant error when there are no auth request params for auth code', async () => {
+    await setupClientConfig(knownClientId)
+
+    jest
+      .spyOn(Config.getInstance(), 'getAuthCodeRequestParams')
+      .mockReturnValue(undefined)
+
+    const clientAssertion = await createValidClientAssertion({
+      iss: knownClientId,
+      sub: knownClientId,
+      aud: audience,
+      jti: randomUUID(),
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 3600
+    })
+
+    const app = createApp()
+    const response = await request(app).post(TOKEN_ENDPOINT).send({
+      grant_type: 'authorization_code',
+      code: randomUUID(),
+      client_assertion_type:
+        'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+      redirect_uri: redirectUri,
+      client_assertion: clientAssertion
+    })
+    expect(response.status).toEqual(400)
+    expect(response.body).toStrictEqual({
+      error: 'invalid_grant',
+      error_description: 'Invalid grant'
+    })
+  })
+
+  test('returns an invalid_grant error if the request redirect uri does not match the auth code params', async () => {
+    await setupClientConfig(knownClientId)
+    jest
+      .spyOn(Config.getInstance(), 'getAuthCodeRequestParams')
+      .mockReturnValue(redirectUriMismatchParams)
+
+    const clientAssertion = await createValidClientAssertion({
+      iss: knownClientId,
+      sub: knownClientId,
+      aud: audience,
+      jti: randomUUID(),
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 3600
+    })
+
+    const app = createApp()
+    const response = await request(app).post(TOKEN_ENDPOINT).send({
+      grant_type: 'authorization_code',
+      code: redirectUriMismatchCode,
+      client_assertion_type:
+        'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+      redirect_uri: redirectUri,
+      client_assertion: clientAssertion
+    })
+    expect(response.status).toEqual(400)
+    expect(response.body).toStrictEqual({
+      error: 'invalid_grant',
+      error_description: 'Invalid grant'
+    })
+  })
+
+  test('returns a valid access_token and id_token for a valid token request with a $tokenSigningAlgorithm signed client assertion', async () => {
+    await setupClientConfig(knownClientId)
+    jest
+      .spyOn(Config.getInstance(), 'getAuthCodeRequestParams')
+      .mockReturnValue(validAuthRequestParams)
+
+    const clientAssertion = await createValidClientAssertion({
+      iss: knownClientId,
+      sub: knownClientId,
+      aud: audience,
+      jti: randomUUID(),
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 3600
+    })
+
+    const app = createApp()
+    const response = await request(app).post(TOKEN_ENDPOINT).send({
+      grant_type: 'authorization_code',
+      code: knownAuthCode,
+      client_assertion_type:
+        'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+      redirect_uri: redirectUri,
+      client_assertion: clientAssertion
+    })
+
+    expect(response.status).toEqual(200)
+
+    const { access_token: accessToken, expires_in: expiresIn, id_token: idToken, token_type: tokenType } = response.body
+
+    const decodedAccessToken = decodeJwtNoVerify(accessToken)
+    const decodedIdToken = decodeJwtNoVerify(idToken)
+
+    expect(expiresIn).toEqual(3600)
+    expect(tokenType).toEqual('Bearer')
+
+    expect(decodedAccessToken.protectedHeader).toStrictEqual({
+      alg: 'RS256',
+      kid: RSA_PRIVATE_TOKEN_SIGNING_KEY_ID
+    })
+    expect(decodedAccessToken.payload.sub).toBe(knownSub)
+    expect(decodedAccessToken.payload.client_id).toBe(knownClientId)
+    expect(decodedAccessToken.payload.sid).toBe(SESSION_ID)
+    expect(decodedAccessToken.payload.scope).toStrictEqual(
+      validAuthRequestParams.scopes
+    )
+    expect(decodedAccessToken.payload.claims).toEqual(VALID_CLAIMS)
+    expect(decodedIdToken.protectedHeader).toStrictEqual({
+      alg: 'RS256',
+      kid: RSA_PRIVATE_TOKEN_SIGNING_KEY_ID
+    })
+    expect(decodedIdToken.payload.sub).toBe(knownSub)
+    expect(decodedIdToken.payload.iss).toBe('http://localhost:3000/')
+    expect(decodedIdToken.payload.vtm).toBe('http://localhost:3000/trustmark')
+    expect(decodedIdToken.payload.aud).toBe(knownClientId)
+    expect(decodedIdToken.payload.sid).toBe(SESSION_ID)
+    expect(decodedIdToken.payload.nonce).toBe(validAuthRequestParams.nonce)
+    expect(decodedIdToken.payload.vot).toBe(
+      validAuthRequestParams.vtr.credentialTrust
+    )
+  })
+})

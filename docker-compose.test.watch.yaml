@@ -1,5 +1,5 @@
 services:
-  ffc-template-node:
+  aphw-ddi-simulator:
     command: >
       sh -c "npm run test:watch"
     volumes:

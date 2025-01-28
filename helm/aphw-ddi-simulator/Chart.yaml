@@ -1,0 +1,9 @@
+apiVersion: v2
+description: One Login Simulator for aphw-ddi-enforcement
+name: aphw-ddi-simulator
+# this version is automatically updated in the build pipeline
+version: 1.0.0
+dependencies:
+- name: ffc-helm-library
+  version: 4.2.0
+  repository: https://raw.githubusercontent.com/defra/ffc-helm-repository/master/

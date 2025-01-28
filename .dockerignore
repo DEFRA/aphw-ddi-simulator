@@ -13,3 +13,8 @@ README.md
 jsconfig.json
 .vscode
 .gitignore
+.git
+.github
+.husky
+dist
+README.md

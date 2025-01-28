@@ -1,0 +1,7 @@
+{{- include "ffc-helm-library.container-config-map" (list . "aphw-ddi-simulator.config-map") -}}
+{{- define "aphw-ddi-simulator.config-map" -}}
+data:
+  NODE_ENV: {{ .Values.environment | quote }}
+  PORT: {{ .Values.container.port | quote }}
+  APPINSIGHTS_CLOUDROLE: {{ .Chart.Name | quote }}
+{{- end -}}

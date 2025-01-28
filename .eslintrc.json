@@ -1,6 +1,7 @@
 {
   "env": {
-    "node": true
+    "node": true,
+    "jest": true
   },
   "plugins": ["import"],
   "extends": [
@@ -13,8 +14,8 @@
   "parser": "@typescript-eslint/parser",
   "rules": {
     "import/no-named-as-default-member": 0,
-    "@typescript-eslint/no-var-requires": 0,
     "@typescript-eslint/no-explicit-any": "off",
+    "@typescript-eslint/no-require-import": "off",
     "no-console": 2,
     "@typescript-eslint/explicit-module-boundary-types": [
       "warn",

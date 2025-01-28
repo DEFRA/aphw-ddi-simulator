@@ -1,24 +1,10 @@
-import { createServer } from '../../../../app/server.js'
+const { createApp } = require('../../../../app/app')
+const request = require('supertest')
 
-describe('healthy test', () => {
-  let server
+test('healthy test', async () => {
+  const app = createApp()
 
-  beforeEach(async () => {
-    server = await createServer()
-    await server.initialize()
-  })
+  const response = await request(app).get('/healthy')
 
-  test('GET /healthy route returns 200', async () => {
-    const options = {
-      method: 'GET',
-      url: '/healthy'
-    }
-
-    const response = await server.inject(options)
-    expect(response.statusCode).toBe(200)
-  })
-
-  afterEach(async () => {
-    await server.stop()
-  })
+  expect(response.status).toEqual(200)
 })

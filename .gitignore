@@ -4,6 +4,9 @@ helm/**/*.lock
 *.tgz
 .vscode
 
+# build directory
+app/**
+
 # Logs
 logs
 *.log

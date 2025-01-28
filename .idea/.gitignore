@@ -139,10 +139,10 @@ dist
 .pnp.*
 
 # JetBrains files
-.idea
+.idea/
 
 # vscode files
-.vscode
+.vscode/
 
 ./*.sql
 *.base64

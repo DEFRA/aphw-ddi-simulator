@@ -12,12 +12,15 @@ ARG PORT_DEBUG
 ENV PORT=${PORT}
 EXPOSE ${PORT} ${PORT_DEBUG}
 
-COPY --chown=node:node package*.json ./
-COPY --chown=node:node . ./
+WORKDIR /home/node
+
+COPY --chown=node:node . .
+
 RUN npm install
 RUN npm run build
-COPY --chown=node:node . .
+
 CMD [ "npm", "run", "start:watch" ]
+
 
 # Production
 FROM defradigital/node:${PARENT_VERSION} AS production

@@ -10,5 +10,4 @@ services:
     ports:
       - "8443:3000"
     volumes:
-      - ./app:/home/node/app
       - ./package.json:/home/node/package.json

@@ -42,3 +42,5 @@ readinessProbe:
 azureIdentity:
   clientID: not-a-real-clientID
   resourceID: not-a-real-resourceID
+
+workloadIdentity: true

@@ -16,7 +16,7 @@ export AUTH_SERVER_HOSTNAME="http://host.docker.internal:8443"
 export AUTH_SERVER_URL="http://host.docker.internal:8443"
 ```
 
-``aphw-ddi-enforcement`` will need the following environment variables:
+``aphw-ddi-simulator`` will need the following environment variables:
 
 ```shell
 #  Setup for Stub

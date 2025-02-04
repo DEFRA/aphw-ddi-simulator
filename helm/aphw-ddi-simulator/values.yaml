@@ -9,19 +9,32 @@ image: aphw-ddi-simulator
 appInsights:
   connectionString:
 
-labels: {}
+labels:
+  component: service
 
-containerConfigMap: {}
+containerConfigMap:
+  name: aphw-ddi-simulator-config-map
 
-containerSecret: {}
+containerSecret:
+  name: aphw-ddi-simulator-container-secret
+  type: Opaque
 
-deployment: {}
+deployment:
+  replicas: 1
+  minReplicas: 1
+  maxReplicas: 1
+  cpuThreshold: 80
+  memoryThreshold: 2250Mi
 
 port: &port 3000
 
 container:
   resourceTier: M
   port: *port
+  simulatorUrl: dummy
+  email: user@example.com
+  redirectUrls: dummy
+  postLogoutRedirectUrl: dummy
 
 livenessProbe:
   path: /healthz
@@ -42,5 +55,10 @@ readinessProbe:
 azureIdentity:
   clientID: not-a-real-clientID
   resourceID: not-a-real-resourceID
+
+ingress:
+  class: nginx
+  endpoint: aphw-ddi-simulator
+  server: example.com
 
 workloadIdentity: true

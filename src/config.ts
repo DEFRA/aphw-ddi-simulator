@@ -397,6 +397,9 @@ CQIDAQAB
   }
 
   public getSimulatorUrlUI(): string {
+    if (this.clientConfiguration.redirectUrls?.some(x => x.includes('host.docker.internal'))) {
+      return this.simulatorUrl.replace('localhost', 'host.docker.internal')
+    }
     if (this.simulatorUrl.includes('host.docker.internal')) {
       return this.simulatorUrl.replace('host.docker.internal', 'localhost')
     }

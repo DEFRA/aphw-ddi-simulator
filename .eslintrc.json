@@ -13,6 +13,7 @@
   ],
   "parser": "@typescript-eslint/parser",
   "rules": {
+    "@typescript-eslint/no-require-imports": "off",
     "import/no-named-as-default-member": 0,
     "@typescript-eslint/no-explicit-any": "off",
     "@typescript-eslint/no-require-import": "off",

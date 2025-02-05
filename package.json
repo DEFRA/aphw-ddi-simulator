@@ -6,7 +6,7 @@
   "main": "app/index.js",
   "scripts": {
     "build": "npx tsc",
-    "pretest": "npm run test:lint",
+    "pretest": "eslint . --ext .ts,.js",
     "test": "jest --runInBand --forceExit",
     "test:watch": "jest --coverage=false --onlyChanged --watch --runInBand",
     "test:lint": "standard",

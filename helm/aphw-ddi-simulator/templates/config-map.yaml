@@ -5,7 +5,6 @@ data:
   PORT: {{ .Values.container.port | quote }}
   APPINSIGHTS_CLOUDROLE: {{ .Chart.Name | quote }}
   SIMULATOR_URL: {{ .Values.container.simulatorUrl | quote }}
-  EMAIL: {{ .Values.container.email | quote }}
   REDIRECT_URLS: {{ .Values.container.redirectUrls | quote }}
   POST_LOGOUT_REDIRECT_URLS: {{ .Values.container.postLogoutRedirectUrl | quote }}
 {{- end -}}

@@ -7,4 +7,5 @@ data:
   SIMULATOR_URL: {{ .Values.container.simulatorUrl | quote }}
   REDIRECT_URLS: {{ .Values.container.redirectUrls | quote }}
   POST_LOGOUT_REDIRECT_URLS: {{ .Values.container.postLogoutRedirectUrl | quote }}
+  EMAIL: {{ .Values.container.email | quote }}
 {{- end -}}

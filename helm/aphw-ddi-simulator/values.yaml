@@ -26,11 +26,9 @@ deployment:
   cpuThreshold: 80
   memoryThreshold: 2250Mi
 
-port: &port 3000
-
 container:
   resourceTier: M
-  port: *port
+  port: 3000
   simulatorUrl: dummy
   email: user@example.com
   redirectUrls: dummy
@@ -38,7 +36,7 @@ container:
 
 livenessProbe:
   path: /healthz
-  port: *port
+  port: 3000
   initialDelaySeconds: 20
   periodSeconds: 10
   failureThreshold: 3
@@ -46,7 +44,7 @@ livenessProbe:
 
 readinessProbe:
   path: /healthy
-  port: *port
+  port: 3000
   initialDelaySeconds: 30
   periodSeconds: 10
   failureThreshold: 3

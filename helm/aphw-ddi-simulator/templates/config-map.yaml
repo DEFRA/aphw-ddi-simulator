@@ -8,4 +8,5 @@ data:
   REDIRECT_URLS: {{ .Values.container.redirectUrls | quote }}
   POST_LOGOUT_REDIRECT_URLS: {{ .Values.container.postLogoutRedirectUrl | quote }}
   EMAIL: {{ .Values.container.email | quote }}
+  ENVIRONMENT_CODE: {{ quote .Values.environmentCode }}
 {{- end -}}

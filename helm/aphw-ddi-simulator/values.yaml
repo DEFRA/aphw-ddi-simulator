@@ -52,17 +52,24 @@ readinessProbe:
   failureThreshold: 3
   timeoutSeconds: 120
 
+workloadIdentity: true
+
 azureIdentity:
   clientID: not-a-real-clientID
   resourceID: not-a-real-resourceID
+
+ingress:
+  class: nginx
+  endpoint: ffc-pay-request-editor
+  server: example.com
 
 service:
   port: 80
   type: ClusterIP
 
-ingress:
-  class: nginx
-  endpoint: aphw-ddi-simulator
-  server: example.com
-
-workloadIdentity: true
+azureAppRegistration:
+  enabled: true
+  clientId:
+  clientSecret:
+  tenantId:
+  redirectUrl: authenticate

@@ -4,5 +4,5 @@ spec:
   template:
     spec:
       containers:
-        - {{ include "ffc-helm-library.container" (list . "aphw-ddi-simulator.container") }}
+      - {{ include "ffc-helm-library.container" (list . "aphw-ddi-simulator.container") }}
 {{- end -}}

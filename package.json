@@ -1,6 +1,6 @@
 {
   "name": "aphw-ddi-simulator",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "One Login Simulator for aphw-ddi-simulator",
   "homepage": "https://github.com/DEFRA/aphw-ddi-simulator",
   "main": "app/index.js",

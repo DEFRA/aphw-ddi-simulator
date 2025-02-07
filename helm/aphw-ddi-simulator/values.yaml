@@ -24,7 +24,7 @@ deployment:
   minReplicas: 1
   maxReplicas: 1
   cpuThreshold: 80
-  memoryThreshold: 2250Mi
+  memoryThreshold: 1250Mi
 
 port: &port 3000
 
@@ -42,7 +42,7 @@ livenessProbe:
   initialDelaySeconds: 20
   periodSeconds: 10
   failureThreshold: 3
-  timeoutSeconds: 5
+  timeoutSeconds: 120
 
 readinessProbe:
   path: /healthy
@@ -50,7 +50,7 @@ readinessProbe:
   initialDelaySeconds: 30
   periodSeconds: 10
   failureThreshold: 3
-  timeoutSeconds: 5
+  timeoutSeconds: 120
 
 azureIdentity:
   clientID: not-a-real-clientID

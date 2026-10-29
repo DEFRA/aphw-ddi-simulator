@@ -13,11 +13,10 @@ labels:
   component: service
 
 containerConfigMap:
-  name: aphw-ddi-simulator-config-map
+  name: aphw-ddi-simulator
 
 containerSecret:
-  name: aphw-ddi-simulator-container-secret
-  type: Opaque
+  name: aphw-ddi-simulator
 
 deployment:
   replicas: 1
@@ -66,3 +65,16 @@ ingress:
   server: example.com
 
 workloadIdentity: true
+
+secretProviderClass:
+  azure:
+    keyvaultName: SNDFFCINFKV2001
+    objects:
+      - objectName: snd2-aphw-appinsights-connectionString
+        objectType: secret
+  secretObjects:
+    - secretName: aphw-ddi-simulator
+      type: Opaque
+      data:
+        - objectName: snd2-aphw-appinsights-connectionString
+          key: APPINSIGHTS_CONNECTIONSTRING

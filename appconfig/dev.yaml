@@ -1,1 +1,23 @@
 ---
+environment: production
+environmentCode: dev
+container:
+  email: user@example.com
+  postLogoutRedirectUrl: https://aphw-ddi-simulator-dev.azure.defra.cloud/post-logout,https://aphw-ddi-simulator-dev.azure.defra.cloud/unauthorised,https://aphw-ddi-simulator-dev.azure.defra.cloud/post-logout-with-feedback,https://aphw-ddi-simulator-dev.azure.defra.cloud/denied,https://aphw-ddi-simulator-dev.azure.defra.cloud/denied-access
+  redirectUrls: https://aphw-ddi-simulator-dev.azure.defra.cloud/authenticate,https://aphw-ddi-simulator-dev.azure.defra.cloud/unauthorised
+  simulatorUrl: https://aphw-ddi-simulator-dev.azure.defra.cloud
+ingress:
+  server: azure.defra.cloud
+  endpoint: aphw-ddi-simulator-dev
+secretProviderClass:
+  azure:
+    keyvaultName: DEVFFCINFKV1001
+    objects:
+      - objectName: devtest-ffcahwr-appInsights-connectionString
+        objectType: secret
+  secretObjects:
+    - secretName: aphw-ddi-simulator
+      type: Opaque
+      data:
+        - objectName: devtest-ffcahwr-appInsights-connectionString
+          key: APPINSIGHTS_CONNECTIONSTRING

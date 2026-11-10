@@ -1,0 +1,11 @@
+---
+environment: production
+environmentCode: snd
+container:
+  email: user@example.com
+  postLogoutRedirectUrl: https://aphw-ddi-enforcement-snd2.azure.defra.cloud/post-logout,https://aphw-ddi-enforcement-snd2.azure.defra.cloud/unauthorised,https://aphw-ddi-enforcement-snd2.azure.defra.cloud/post-logout-with-feedback,https://aphw-ddi-enforcement-snd2.azure.defra.cloud/denied,https://aphw-ddi-enforcement-snd2.azure.defra.cloud/denied-access
+  redirectUrls: https://aphw-ddi-enforcement-snd2.azure.defra.cloud/authenticate,https://aphw-ddi-enforcement-snd2.azure.defra.cloud/unauthorised
+  simulatorUrl: https://aphw-ddi-simulator-snd2.azure.defra.cloud
+ingress:
+  server: azure.defra.cloud
+  endpoint: aphw-ddi-simulator-snd
